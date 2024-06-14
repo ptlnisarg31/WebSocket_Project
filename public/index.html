@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Chat App</title>
+    <link rel="stylesheet" href="./style.css">
+
+</head>
+<body>
+    <div id="chat-container">
+        <h1>WebSocket Chat</h1>
+        <div id="messages"></div>
+        <div id="user-section">
+            <input type="text" id="username" placeholder="Enter Your Name" />
+            <button id="startChatBtn">Start Chat</button>
+        </div>
+        <div id="chat-section" style="display:none;">
+            <input type="text" id="message" placeholder="Enter Message" />
+            <button id="sendBtn" disabled>Send</button>
+        </div>
+    </div>
+
+    <!-- Including socket.io library -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const socket = io();
+            const startChatBtn = document.getElementById("startChatBtn");
+            const sendBtn = document.getElementById("sendBtn");
+            const usernameInput = document.getElementById("username");
+            const messageInput = document.getElementById("message");
+            const messagesContainer = document.getElementById("messages");
+            const chatSection = document.getElementById("chat-section");
+            const userSection = document.getElementById("user-section");
+
+            let username = '';
+
+            // Enable the send button if there's text in the input
+            messageInput.addEventListener('input', () => {
+                sendBtn.disabled = messageInput.value.trim() === '';
+            });
+
+            // Allow user to start chat after entering a username
+            startChatBtn.addEventListener('click', () => {
+                username = usernameInput.value.trim();
+                if (username) {
+                    userSection.style.display = 'none';
+                    chatSection.style.display = 'flex';
+                    messageInput.focus();
+                    displayMessage('You have joined the chat.', 'system');
+                    socket.emit('join', username);
+                }
+            });
+
+            // Send message on button click or Enter key press
+            sendBtn.addEventListener('click', sendMessage);
+            messageInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !sendBtn.disabled) {
+                    sendMessage();
+                }
+            });
+
+            // Automatically focus on the username input when the page loads
+            usernameInput.focus();
+
+            // Function to send a message
+            function sendMessage() {
+                const message = messageInput.value.trim();
+                if (message) {
+                    // Emit the message with username
+                    socket.emit('user-msg', { username, message });
+                    // Display the message locally as coming from "You"
+                    displayMessage(`You: ${message}`, 'from-user');
+                    messageInput.value = ''; // Clear input after sending
+                    messageInput.focus(); // Focus back on the input field
+                    sendBtn.disabled = true; // Disable send button until next input
+                }
+            }
+
+            // Function to display messages
+            function displayMessage(message, type) {
+                const messageElement = document.createElement('div');
+                messageElement.classList.add('message', type);
+                messageElement.textContent = message;
+                messagesContainer.appendChild(messageElement);
+                messagesContainer.scrollTop = messagesContainer.scrollHeight; // Scroll to bottom
+            }
+
+            // Listen for server messages
+            socket.on('server-msg', (data) => {
+                if (typeof data === 'string') {
+                    displayMessage(data, 'system');
+                } else if (data.username) {
+                    if (data.username !== username) {
+                        displayMessage(`${data.username}: ${data.message}`, 'from-server');
+                    }
+                }
+            });
+
+            // Handle socket connection and disconnection
+            socket.on('connect', () => {
+                displayMessage('You are connected to the server.', 'system');
+                console.log('Connected to the server');
+            });
+
+            socket.on('disconnect', () => {
+                displayMessage('You have been disconnected from the server.', 'system');
+                console.log('Disconnected from the server');
+            });
+        });
+    </script>
+</body>
+</html>
